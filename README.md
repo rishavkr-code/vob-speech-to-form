@@ -5,21 +5,21 @@ Voice → Form (Add Patient): speak patient/insurance details, fields fill in li
 ```
 browser mic ──16 kHz PCM (WebSocket)──▶ FastAPI ──▶ Deepgram live
                                 │
-     form fields ◀── LLM via OpenRouter (JSON schema) ◀── transcript + current form state
+     form fields ◀── Claude Haiku 5.5 (JSON schema) ◀── transcript + current form state
 ```
 
 ## Run
 ```bash
-cp .env.example .env   # fill DEEPGRAM_API_KEY, OPENROUTER_API_KEY
+cp .env.example .env   # fill DEEPGRAM_API_KEY, ANTHROPIC_API_KEY
 uv sync
 uv run uvicorn app.main:app --reload --port 8000
 ```
-API docs (OpenAPI): http://localhost:8000/docs
+Open http://localhost:8000 in **Chrome** and press the mic (or Space). API docs (OpenAPI): http://localhost:8000/docs
 
 ## Develop
 ```bash
 uv sync                 # includes dev tools (pytest, ruff)
-uv run pytest           # offline: the LLM call is stubbed
+uv run pytest           # offline: the Claude call is stubbed
 uv run ruff check .
 ```
 CI runs the same checks plus a Docker build on every PR. Work on a branch and open a PR into `main`.
@@ -28,17 +28,15 @@ Postman: import `postman/vob-speech-to-form.postman_collection.json` and set `ba
 
 ## Deploy
 ```bash
-docker build -t vob-audio .
-docker run -p 8000:8000 --env-file .env vob-audio
+docker build -t vob-speech-to-form .
+docker run -p 8000:8000 --env-file .env vob-speech-to-form
 ```
-Settings are env vars; see `.env.example` (`CORS_ORIGINS`, `SAVE_RECORDINGS`, `SERVE_DEMO_UI`).
-Open http://localhost:8000 in **Chrome**. Press the mic (or Space).
+Settings are env vars; see `.env.example` (`CORS_ORIGINS`, `SAVE_RECORDINGS`, `SERVE_DEMO_UI`). Deployed on Render as a Docker web service with health check `/api/health`.
 
-## What you can compare
-- **Engine**: Deepgram streaming / browser Web Speech (free baseline)
-- **Speech-to-text model**: nova-3 (default), nova-3-medical (keyterm boosting for insurer/doctor names)
-- **Extraction LLM**: gpt-oss-20b on Groq (default, ~0.6s; auto-falls back to gpt-oss-120b on Cerebras if Groq errors), gpt-oss-120b on Cerebras / Groq, gpt-4.1-mini, claude-haiku-5.5, gemini-3.1-flash-lite, gemini-2.5-flash-lite, qwen3.5-9b
-- **Timings panel**: time to first words, extraction latency, "speech end → field filled"
+## How it works
+- **Speech-to-text**: Deepgram live streaming only; nova-3 (default) or nova-3-medical, with keyterm boosting for insurer/doctor names
+- **Extraction**: Claude Haiku 5.5 (`claude-haiku-5-5`, effort `low`, JSON-schema output), then deterministic cleanup and dropdown matching
+- **Timings panel** (demo UI): time to first words, extraction latency, "speech end → field filled"
 
 ## Things to try saying
 - Spelled names: "last name Quezada, Q U E Z A D A"

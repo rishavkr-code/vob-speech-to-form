@@ -1,26 +1,23 @@
-"""Transcript + current form -> form fields, via an LLM on OpenRouter, then deterministic cleanup."""
+"""Transcript + current form -> form fields, via Claude Haiku, then deterministic cleanup."""
 
 import difflib
 import json
 from datetime import date
 
-import httpx
+import anthropic
 
 from . import settings
-from .catalog import EXTRACT_MODELS, FALLBACK_MODEL, FIELDS, OPTIONS
-from .clients import http
+from .catalog import EXTRACT_MODEL, FIELDS, OPTIONS
+
+client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY or None, timeout=20.0)
 
 EXTRACT_SCHEMA = {
-    "name": "fill_form",
-    "strict": True,
-    "schema": {
-        "type": "object",
-        "properties": {
-            k: {"type": ["string", "null"], "description": d} for k, d in FIELDS.items()
-        },
-        "required": list(FIELDS),
-        "additionalProperties": False,
+    "type": "object",
+    "properties": {
+        k: {"type": ["string", "null"], "description": d} for k, d in FIELDS.items()
     },
+    "required": list(FIELDS),
+    "additionalProperties": False,
 }
 
 SYSTEM = """You fill a medical "Add Patient" insurance-verification form from a spoken transcript
@@ -40,59 +37,51 @@ Rules:
 - Never invent values that were not said."""
 
 
-async def extract(
-    transcript: str, current: dict, model: str, today: date
-) -> tuple[dict | None, str, str | None, str | None]:
-    """Returns (fields, model_used, fallback_reason, error)."""
+class ExtractError(Exception):
+    def __init__(self, message: str, status_code: int = 502):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+async def extract(transcript: str, current: dict, today: date) -> dict:
+    """Returns the normalized form state. Raises ExtractError."""
     user = (
         f"Today's date: {today.isoformat()}\n\n"
         f"Allowed options:\n{json.dumps(OPTIONS, indent=2)}\n\n"
         f"Current form values:\n{json.dumps(current, indent=2)}\n\n"
         f"Transcript:\n\"\"\"{transcript}\"\"\""
     )
-    fields, err = await call_llm(model, user)
-    fallback_reason = None
-    if err and model != FALLBACK_MODEL:
-        fallback_reason = err[:200]
-        model = FALLBACK_MODEL
-        fields, err = await call_llm(model, user)
-    if err:
-        return None, model, fallback_reason, err
-    return normalize(fields), model, fallback_reason, None
+    return normalize(await call_llm(user))
 
 
-async def call_llm(model: str, user: str) -> tuple[dict | None, str | None]:
-    """One OpenRouter call. Returns (fields, None) or (None, error)."""
-    slug, _, host = model.partition("@")
-    body = {
-        "model": slug,
-        "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}],
-        "response_format": {"type": "json_schema", "json_schema": EXTRACT_SCHEMA},
-        "max_tokens": 1024,
-        # Only route to providers that honour json_schema.
-        "provider": {"require_parameters": True},
-        **EXTRACT_MODELS[model],
-    }
-    if host:
-        body["provider"] |= {"order": [host], "allow_fallbacks": False}
+async def call_llm(user: str) -> dict:
+    """One Claude call with the form schema enforced. Raises ExtractError."""
     try:
-        r = await http.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}"},
-            json=body,
+        response = await client.messages.create(
+            model=EXTRACT_MODEL,
+            max_tokens=4096,  # room for (low-effort) thinking plus ~11 short fields
+            # Latency matters more than depth here: low effort thinks little or not at all.
+            output_config={"effort": "low", "format": {"type": "json_schema", "schema": EXTRACT_SCHEMA}},
+            system=SYSTEM,
+            messages=[{"role": "user", "content": user}],
         )
-    except httpx.HTTPError as e:
-        return None, f"{model}: {e!r}"
-    if r.status_code != 200:
-        return None, f"{model}: {r.text}"
-    try:
-        return json.loads(r.json()["choices"][0]["message"]["content"]), None
-    except (KeyError, IndexError, TypeError, json.JSONDecodeError):
-        return None, f"{model}: bad output {r.text[:500]}"
+    except anthropic.RateLimitError as e:
+        raise ExtractError(f"rate limited by Anthropic: {e.message}", 429) from e
+    except anthropic.APIStatusError as e:
+        raise ExtractError(f"Anthropic API error {e.status_code}: {e.message}") from e
+    except anthropic.APIConnectionError as e:
+        raise ExtractError(f"could not reach Anthropic: {e}") from e
+
+    if response.stop_reason != "end_turn":
+        raise ExtractError(f"model stopped early ({response.stop_reason})")
+    text = next((b.text for b in response.content if b.type == "text"), None)
+    if text is None:
+        raise ExtractError("model returned no text")
+    return json.loads(text)
 
 
 def normalize(fields: dict) -> dict:
-    """Deterministic cleanup so small models don't have to get formatting perfect."""
+    """Deterministic cleanup so the model doesn't have to get formatting perfect."""
     for k, v in fields.items():
         if isinstance(v, str) and v.strip().lower() in ("", "null", "none", "n/a"):
             fields[k] = None

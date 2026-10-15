@@ -1,10 +1,11 @@
-"""Route tests. The LLM call is stubbed, so these run offline and without API keys."""
+"""Route tests. The Claude call is stubbed, so these run offline and without API keys."""
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app import extract as extract_mod
-from app.catalog import FALLBACK_MODEL, FIELDS
+from app.catalog import EXTRACT_MODEL, FIELDS
+from app.extract import ExtractError
 from app.main import app
 
 client = TestClient(app)
@@ -12,14 +13,15 @@ client = TestClient(app)
 
 @pytest.fixture
 def llm(monkeypatch):
-    """Replace the OpenRouter call; tests set `llm.replies` to a list of (fields, error) per call."""
-    calls = []
+    """Replace the Claude call; set `llm.reply` to a dict (returned) or an ExtractError (raised)."""
+    stub = type("Stub", (), {"reply": None, "prompts": []})()
 
-    async def fake(model, user):
-        calls.append((model, user))
-        return stub.replies.pop(0)
+    async def fake(user):
+        stub.prompts.append(user)
+        if isinstance(stub.reply, Exception):
+            raise stub.reply
+        return stub.reply
 
-    stub = type("Stub", (), {"replies": [], "calls": calls})()
     monkeypatch.setattr(extract_mod, "call_llm", fake)
     return stub
 
@@ -32,38 +34,30 @@ def test_config_lists_fields_and_models():
     body = client.get("/api/config").json()
     assert set(body["fields"]) == set(FIELDS)
     assert body["stt_models"] == ["nova-3", "nova-3-medical"]
-    assert body["extract_models"]
+    assert "anthropic_configured" in body
 
 
 def test_extract_returns_normalized_fields(llm):
-    llm.replies = [({**dict.fromkeys(FIELDS), "last_name": "QUEZADA", "insurance_provider": "united"}, None)]
+    llm.reply = {**dict.fromkeys(FIELDS), "last_name": "QUEZADA", "insurance_provider": "united"}
     r = client.post("/api/extract", json={"transcript": "last name quezada", "today": "2026-10-15"})
     assert r.status_code == 200
     body = r.json()
     assert body["fields"]["last_name"] == "Quezada"
     assert body["fields"]["insurance_provider"] == "UnitedHealthcare"
-    assert body["fallback_reason"] is None
-    assert "Today's date: 2026-10-15" in llm.calls[0][1]
+    assert body["model"] == EXTRACT_MODEL
+    assert "Today's date: 2026-10-15" in llm.prompts[0]
 
 
-def test_extract_falls_back_when_model_fails(llm):
-    llm.replies = [(None, "groq: 429"), (dict.fromkeys(FIELDS), None)]
-    body = client.post("/api/extract", json={"transcript": "hi"}).json()
-    assert body["model"] == FALLBACK_MODEL
-    assert body["fallback_reason"] == "groq: 429"
-
-
-def test_extract_502_when_both_fail(llm):
-    llm.replies = [(None, "a down"), (None, "b down")]
+def test_extract_upstream_error_is_502(llm):
+    llm.reply = ExtractError("Anthropic API error 500: boom")
     r = client.post("/api/extract", json={"transcript": "hi"})
     assert r.status_code == 502
-    assert r.json() == {"error": "b down"}
+    assert r.json() == {"error": "Anthropic API error 500: boom"}
 
 
-def test_extract_unknown_model():
-    r = client.post("/api/extract", json={"transcript": "hi", "model": "nope"})
-    assert r.status_code == 400
-    assert "unknown model" in r.json()["error"]
+def test_extract_rate_limit_is_429(llm):
+    llm.reply = ExtractError("rate limited by Anthropic: slow down", 429)
+    assert client.post("/api/extract", json={"transcript": "hi"}).status_code == 429
 
 
 def test_extract_invalid_body():

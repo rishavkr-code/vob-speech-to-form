@@ -1,6 +1,6 @@
 """Deepgram live speech-to-text settings."""
 
-import httpx
+from urllib.parse import urlencode
 
 from .catalog import KEYTERMS, SAMPLE_RATE
 
@@ -24,4 +24,4 @@ def deepgram_params(model: str) -> list[tuple[str, str]]:
 
 
 def deepgram_live_url(model: str) -> str:
-    return "wss://api.deepgram.com/v1/listen?" + str(httpx.QueryParams(deepgram_params(model)))
+    return "wss://api.deepgram.com/v1/listen?" + urlencode(deepgram_params(model))

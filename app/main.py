@@ -8,17 +8,17 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import settings
-from .clients import http
+from .extract import client
 from .routes import api, stream
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     yield
-    await http.aclose()
+    await client.close()
 
 
-app = FastAPI(title="VOB Audio API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="VOB Audio API", version="0.2.0", lifespan=lifespan)
 
 if settings.CORS_ORIGINS:
     app.add_middleware(

@@ -18,15 +18,13 @@ class ConfigResponse(BaseModel):
     options: dict[str, list[str]] = Field(description="Allowed values for each dropdown field")
     fields: dict[str, str] = Field(description="Every form field name -> what it holds")
     stt_models: list[str] = Field(description="Models for /ws/deepgram; first one is the default")
-    extract_models: list[str] = Field(description="First one is the default")
     deepgram_configured: bool
-    openrouter_configured: bool
+    anthropic_configured: bool
 
 
 class ExtractRequest(BaseModel):
     transcript: str = Field("", description="Everything said so far in this session (finals joined by spaces)")
     current: FormFields = Field(default_factory=dict, description="Current form values; keys from `fields`")
-    model: str | None = Field(None, description="One of config.extract_models; omitted = the default")
     today: date | None = Field(
         None, description="User's local date for 'tomorrow' etc. Omitted = the server's date (UTC on most hosts)"
     )
@@ -36,7 +34,6 @@ class ExtractRequest(BaseModel):
             "example": {
                 "transcript": "Patient is Emily Quezada, that's Q U E Z A D A. Insurance is Aetna.",
                 "current": {k: None for k in FIELDS},
-                "model": "openai/gpt-oss-20b@groq",
                 "today": "2026-10-15",
             }
         }
@@ -45,9 +42,8 @@ class ExtractRequest(BaseModel):
 
 class ExtractResponse(BaseModel):
     fields: FormFields = Field(description="FULL desired state of every field (null = empty)")
-    ms: int = Field(description="LLM time including any fallback retry, milliseconds")
-    model: str = Field(description="Model that produced the answer (differs from the request after a fallback)")
-    fallback_reason: str | None = Field(None, description="Why the requested model was abandoned, if it was")
+    ms: int = Field(description="Model time, milliseconds")
+    model: str = Field(description="Model that produced the answer")
 
 
 class Health(BaseModel):

@@ -5,7 +5,7 @@ const FIELD_NAMES = [...form.elements].map((el) => el.name).filter(Boolean);
 let finals = [];          // finalized transcript segments
 let interim = "";
 let recording = false;
-let stopFn = null;        // engine-specific stop
+let stopFn = null;        // stops the live session
 let extractInflight = false;
 let extractPending = false;
 let speechEndAt = null;   // when the latest utterance ended (for end-to-end timing)
@@ -18,15 +18,9 @@ let speechEndAt = null;   // when the latest utterance ended (for end-to-end tim
     for (const o of opts) sel.add(new Option(o, o));
   }
   for (const m of cfg.stt_models) $("#model").add(new Option(m, m));
-  for (const m of cfg.extract_models) $("#llm").add(new Option(m, m));
-  if (!cfg.openrouter_configured) log("OPENROUTER_API_KEY not set in .env", true);
-  if (!cfg.deepgram_configured) log("DEEPGRAM_API_KEY not set in .env", true);
-  $("#engine").onchange();
+  if (!cfg.anthropic_configured) log("ANTHROPIC_API_KEY not set on the server", true);
+  if (!cfg.deepgram_configured) log("DEEPGRAM_API_KEY not set on the server", true);
 })();
-
-$("#engine").onchange = () => {
-  $("#model-ctl").style.display = $("#engine").value === "webspeech" ? "none" : "";
-};
 
 form.elements.insurance_provider.addEventListener("change", syncPolicyEnabled);
 function syncPolicyEnabled() {
@@ -52,9 +46,8 @@ $("#reset").onclick = () => {
 
 // ---------------- recording control ----------------
 async function start() {
-  const engine = $("#engine").value;
   try {
-    stopFn = engine === "dg-live" ? await startDeepgramLive() : startWebSpeech();
+    stopFn = await startDeepgramLive();
   } catch (e) {
     log(`start failed: ${e.message}`, true);
     return;
@@ -62,7 +55,7 @@ async function start() {
   recording = true;
   $("#mic").classList.add("live");
   $("#mic-label").textContent = "Stop";
-  status(`listening (${engine})`);
+  status("listening");
 }
 
 function stop() {
@@ -156,32 +149,6 @@ async function startDeepgramLive() {
   };
 }
 
-// --- Browser Web Speech API (Chrome/Edge/Safari only) ---
-function startWebSpeech() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) throw new Error("Web Speech API not supported in this browser (use Chrome)");
-  const sr = new SR();
-  sr.continuous = true;
-  sr.interimResults = true;
-  sr.lang = "en-US";
-  sr.onresult = (e) => {
-    interim = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const res = e.results[i];
-      if (res.isFinal) {
-        finals.push(res[0].transcript.trim());
-        speechEndAt = performance.now();
-        scheduleExtract();
-      } else interim += res[0].transcript;
-    }
-    renderTranscript();
-  };
-  sr.onerror = (e) => log(`webspeech: ${e.error}`, true);
-  sr.onend = () => recording && sr.start(); // Chrome stops after silence; keep going
-  sr.start();
-  return () => { sr.onend = null; sr.stop(); };
-}
-
 // ---------------- extraction ----------------
 let debounce;
 function scheduleExtract() {
@@ -202,13 +169,12 @@ async function runExtract() {
     const r = await fetch("/api/extract", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transcript, current: currentValues(), model: $("#llm").value, today: localDate() }),
+      body: JSON.stringify({ transcript, current: currentValues(), today: localDate() }),
     }).then((r) => r.json());
     if (r.error) throw new Error(r.error);
-    if (r.fallback_reason) log(`fell back to ${r.model.split("/").pop()}: ${r.fallback_reason.slice(0, 120)}`, true);
     const changed = applyFields(r.fields);
     const e2e = endAt ? ` · speech end → filled <b>${Math.round(performance.now() - endAt)}ms</b>` : "";
-    log(`${r.model.split("/").pop()} <b>${r.ms}ms</b>${e2e} · ${changed.length ? changed.join(", ") : "no changes"}`);
+    log(`${r.model} <b>${r.ms}ms</b>${e2e} · ${changed.length ? changed.join(", ") : "no changes"}`);
   } catch (e) {
     log(`extract failed: ${e.message}`, true);
   } finally {

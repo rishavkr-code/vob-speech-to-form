@@ -35,26 +35,5 @@ KEYTERMS = [*OPTIONS["insurance_provider"], "policy number", "date of birth", "s
 # The browser streams raw 16 kHz mono PCM (see static/app.js).
 SAMPLE_RATE = 16000
 
-# ---- extraction LLMs (via OpenRouter) ----
-# First is the default. All support json_schema structured output.
-# Value = extra request params for that model. Thinking adds seconds of latency and this task
-# doesn't need it, so it's switched off where the model has it.
-NO_THINKING = {"reasoning": {"enabled": False}, "temperature": 0}
-# "model@provider" pins the request to that host (Cerebras/Groq/SambaNova run on custom chips
-# and are several times faster than GPU hosts).
-LOW_THINKING = {"reasoning": {"effort": "low"}, "temperature": 0}
-# Note: the same model gave much worse answers on other gpt-oss-20b hosts (CoreWeave, Vertex,
-# DeepInfra, AkashML), so keep it pinned to Groq.
-EXTRACT_MODELS = {
-    "openai/gpt-oss-20b@groq": LOW_THINKING,       # chosen: ~0.6s, accurate, cheap
-    "openai/gpt-oss-120b@cerebras": LOW_THINKING,  # ~0.5s; also the fallback below
-    "openai/gpt-oss-120b@groq": LOW_THINKING,
-    "openai/gpt-4.1-mini": {"temperature": 0},     # steady GPU-hosted baseline
-    "anthropic/claude-haiku-5.5": {},              # accurate, ~2s; no temperature param
-    "google/gemini-3.1-flash-lite": {"reasoning": {"effort": "minimal"}, "temperature": 0},
-    "google/gemini-2.5-flash-lite": NO_THINKING,   # ~1s; sometimes adds words to appointment type
-    "qwen/qwen3.5-9b": NO_THINKING,                # cheapest
-}
-DEFAULT_EXTRACT_MODEL = next(iter(EXTRACT_MODELS))
-# Used when the chosen model's host is rate-limited or erroring (Groq on OpenRouter can 429).
-FALLBACK_MODEL = "openai/gpt-oss-120b@cerebras"
+# ---- extraction LLM ----
+EXTRACT_MODEL = "claude-haiku-5-5"

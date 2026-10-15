@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 STATIC = ROOT / "static"
 
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY", "")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or os.getenv("openrouter_api_key", "")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 # Comma-separated origins allowed to call the API from a browser on another domain,
 # e.g. "https://app.example.com,http://localhost:3000". Empty = same-origin only.
