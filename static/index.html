@@ -3,77 +3,330 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Voice Form POC</title>
+  <title>Verification of Benefits · Insurance Verification</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <!-- POC controls (not part of the real UI) -->
-  <section class="toolbar">
-    <div class="ctl">
-      <label>Speech-to-text model</label>
-      <select id="model"></select>
-    </div>
-    <button id="mic" class="mic" title="Start / stop (Space)">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v5"/></svg>
-      <span id="mic-label">Start speaking</span>
-    </button>
-    <button id="reset" class="ghost">Reset</button>
-    <div id="status" class="status">idle</div>
-  </section>
+  <!-- Icon sprite (Lucide-style, 24px grid, stroke icons) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+      <symbol id="i-shield-check" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+      <symbol id="i-trend" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+      <symbol id="i-steth" viewBox="0 0 24 24"><path d="M11 2v2M5 2v2M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1"/><path d="M8 15a6 6 0 0 0 12 0v-3"/><circle cx="20" cy="10" r="2"/></symbol>
+      <symbol id="i-building" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></symbol>
+      <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+      <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+      <symbol id="i-chevs" viewBox="0 0 24 24"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+      <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+      <symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+      <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></symbol>
+      <symbol id="i-user-x" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" x2="22" y1="8" y2="13"/><line x1="22" x2="17" y1="8" y2="13"/></symbol>
+      <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+      <symbol id="i-sort" viewBox="0 0 24 24"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></symbol>
+      <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-msg" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+      <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+      <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+      <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.13-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.13a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.13 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.13a.5.5 0 0 1-.96 0z"/><path d="M20 3v4M22 5h-4M4 17v2M5 18H3"/></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3" fill="currentColor"/></symbol>
+      <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></symbol>
+    </defs>
+  </svg>
 
-  <div class="modal">
-    <button class="close" aria-label="Close">&times;</button>
-    <form id="form" autocomplete="off">
-      <div class="col left">
-        <div class="eyebrow"><span class="dot"></span>REQUIRED INFORMATION</div>
-        <h1>Add Patient</h1>
-        <p class="sub">Enter patient and insurance details to start verification</p>
-
-        <div class="row">
-          <div class="field"><label>FIRST NAME <i>*</i></label><input name="first_name" placeholder="e.g. Emily" /></div>
-          <div class="field"><label>LAST NAME <i>*</i></label><input name="last_name" placeholder="e.g. Quezada" /></div>
-        </div>
-        <div class="field"><label>INSURANCE PROVIDER <i>*</i></label>
-          <select name="insurance_provider" class="filled-bg"><option value="">Select insurance provider</option></select>
-        </div>
-        <div class="field"><label>POLICY NUMBER <i>*</i></label>
-          <input name="policy_number" placeholder="Select insurance provider first" disabled />
-        </div>
-        <div class="row">
-          <div class="field"><label>DATE OF BIRTH <i>*</i></label><input type="date" name="date_of_birth" /></div>
-          <div class="field"><label>SERVICE DATE <i>*</i></label><input type="date" name="service_date" /></div>
+  <div class="app">
+    <!-- ================= Top bar ================= -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-title">Insurance Verification</div>
+        <div class="brand-sub">POWERED BY <span class="raga"><i></i>RagaAI</span></div>
+      </div>
+      <nav class="tabs" aria-label="Primary">
+        <a class="tab active" href="#" aria-current="page"><svg class="ic"><use href="#i-grid"/></svg>Overview</a>
+        <a class="tab" href="#"><svg class="ic"><use href="#i-file"/></svg>Fee Schedules</a>
+        <a class="tab" href="#"><svg class="ic"><use href="#i-trend"/></svg>Analytics</a>
+      </nav>
+      <div class="top-actions">
+        <button class="icon-btn" aria-label="Toggle theme"><svg class="ic"><use href="#i-sun"/></svg></button>
+        <button class="icon-btn bell" aria-label="Notifications"><svg class="ic"><use href="#i-bell"/></svg><span class="badge">99+</span></button>
+        <div class="me">
+          <span class="avatar sa">SA</span>
+          <span class="me-text"><b>Super Admin</b><small>Super Admin</small></span>
         </div>
       </div>
+    </header>
 
-      <div class="col right">
-        <div class="eyebrow muted center">OPTIONAL DETAILS</div>
-        <div class="field"><label>PROVIDER NAME</label>
-          <select name="provider_name"><option value="">e.g. Dr. Barberis</option></select>
+    <main class="page">
+      <!-- ================= Page header + filters ================= -->
+      <section class="page-head">
+        <div class="title-wrap">
+          <div class="title-icon"><svg class="ic"><use href="#i-shield"/></svg></div>
+          <div>
+            <h1>Verification of Benefits <span class="demo-pill"><svg class="ic"><use href="#i-play"/></svg>Demo</span></h1>
+            <p>Manage patient benefit verifications and cost estimates</p>
+          </div>
         </div>
-        <div class="field"><label>CLINIC</label>
-          <select name="clinic"><option value="">e.g. Denver Allergy</option></select>
+        <div class="filters">
+          <div class="filter">
+            <label>Doctor</label>
+            <button class="filter-btn"><svg class="ic"><use href="#i-steth"/></svg><span>All Doctors</span><svg class="ic chev"><use href="#i-chev-down"/></svg></button>
+          </div>
+          <div class="filter">
+            <label>Clinic</label>
+            <button class="filter-btn"><svg class="ic"><use href="#i-building"/></svg><span>All Clinics</span><svg class="ic chev"><use href="#i-chev-down"/></svg></button>
+          </div>
+          <div class="filter wide">
+            <label>Date range</label>
+            <button class="filter-btn date"><svg class="ic"><use href="#i-calendar"/></svg><span>All Data</span></button>
+          </div>
+          <button class="reset-btn"><svg class="ic"><use href="#i-reset"/></svg>Reset</button>
         </div>
-        <div class="field"><label>APPOINTMENT TYPE</label><input name="appointment_type" placeholder="e.g. New Patient" /></div>
-        <div class="field"><label>PHONE NUMBER</label><input name="phone_number" placeholder="e.g. (303) 555-0100" /></div>
-        <div class="field"><label>EMAIL</label><input name="email" placeholder="e.g. patient@email.com" /></div>
-      </div>
-    </form>
+      </section>
+
+      <!-- ================= Stats + operations ================= -->
+      <section class="overview">
+        <div class="stats">
+          <article class="stat green">
+            <div><span class="stat-label">Total VOBs</span><strong class="stat-num" data-count="2233">2,233</strong></div>
+            <svg class="stat-art" viewBox="0 0 64 64" aria-hidden="true">
+              <defs><linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8ef0b0"/><stop offset="1" stop-color="#2fb36a"/></linearGradient></defs>
+              <path d="M32 6c5 4 11 6 17 6v15c0 13-8 20-17 24-9-4-17-11-17-24V12c6 0 12-2 17-6z" fill="url(#g-green)" opacity=".95"/>
+              <path d="m24 28 6 6 11-12" fill="none" stroke="#0e3b23" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M6 54h12l4-7 5 12 5-9 3 4h23" fill="none" stroke="#5fe39a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M52 10l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2z" fill="#f5d34d"/>
+            </svg>
+          </article>
+          <article class="stat purple">
+            <div><span class="stat-label">Generated VOBs</span><strong class="stat-num" data-count="1580">1,580</strong></div>
+            <div class="stat-orb"><svg viewBox="0 0 64 64" aria-hidden="true">
+              <defs><linearGradient id="g-purple" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3e9ff"/><stop offset="1" stop-color="#c7a6ff"/></linearGradient></defs>
+              <path d="M22 14h14l8 8v26a3 3 0 0 1-3 3H22a3 3 0 0 1-3-3V17a3 3 0 0 1 3-3z" fill="url(#g-purple)"/>
+              <path d="M36 14v8h8" fill="#a77cf5"/>
+              <path d="M25 30h14M25 36h14M25 42h9" stroke="#8f5cf0" stroke-width="2.4" stroke-linecap="round"/>
+              <circle cx="46" cy="13" r="4" fill="#ff5a5f"/>
+            </svg></div>
+          </article>
+          <article class="stat teal">
+            <div><span class="stat-label">Not Generated VOBs</span><strong class="stat-num" data-count="653">653</strong></div>
+            <div class="stat-orb"><svg viewBox="0 0 64 64" aria-hidden="true">
+              <rect x="15" y="17" width="30" height="27" rx="5" fill="#e6fbf6"/>
+              <rect x="15" y="17" width="30" height="8" rx="4" fill="#4fc7b0"/>
+              <path d="M21 31h6M21 37h6M31 31h6" stroke="#4fc7b0" stroke-width="2.4" stroke-linecap="round"/>
+              <circle cx="43" cy="42" r="8" fill="#2ca58d" stroke="#e6fbf6" stroke-width="2.5"/>
+              <path d="m39.5 42 2.5 2.5 4.5-5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg></div>
+          </article>
+
+          <div class="status-filter" role="group" aria-label="Status filter">
+            <span class="sf-label">Status filter</span>
+            <span class="sf-sep"></span>
+            <button class="chip" data-status="draft"><svg class="ic"><use href="#i-file"/></svg>In Draft</button>
+            <button class="chip" data-status="finalized"><svg class="ic"><use href="#i-clipboard"/></svg>Cost Finalized</button>
+            <button class="chip" data-status="pending"><svg class="ic"><use href="#i-alert"/></svg>Pending Action</button>
+            <button class="chip" data-status="inactive"><svg class="ic"><use href="#i-user-x"/></svg>Inactive / Not Verified</button>
+          </div>
+        </div>
+
+        <aside class="ops">
+          <div class="ops-head"><span class="ops-dot"></span><span>Operations</span><svg class="ic zap"><use href="#i-zap"/></svg></div>
+          <button class="op green" id="open-add" data-tip="Start benefits enquiry for a patient">
+            <span class="op-icon"><svg class="ic"><use href="#i-shield"/></svg><span class="op-plus"><svg class="ic"><use href="#i-plus"/></svg></span></span>
+            <span class="op-text"><b>Add patient</b><small>Start now</small></span>
+            <span class="op-go"><svg class="ic"><use href="#i-chev-right"/></svg></span>
+          </button>
+          <button class="op blue" data-tip="Upload a CSV of patients for batch verification">
+            <span class="op-icon"><svg class="ic"><use href="#i-upload"/></svg><span class="op-dot"></span></span>
+            <span class="op-text"><b>Upload patients</b><small>Batch processing</small></span>
+            <span class="op-go"><svg class="ic"><use href="#i-chev-right"/></svg></span>
+          </button>
+        </aside>
+      </section>
+
+      <!-- ================= Patients table ================= -->
+      <section class="table-card">
+        <div class="table-tools">
+          <label class="search"><svg class="ic"><use href="#i-search"/></svg><input id="search" placeholder="Search Patient" autocomplete="off" /></label>
+          <button class="tool-btn"><svg class="ic"><use href="#i-sort"/></svg>Service Date<svg class="ic"><use href="#i-arrow-down"/></svg></button>
+          <button class="tool-btn"><svg class="ic"><use href="#i-sliders"/></svg>Filter</button>
+          <label class="tool-btn pii"><svg class="ic"><use href="#i-eye"/></svg>Show PII
+            <input type="checkbox" id="pii" checked /><span class="switch" aria-hidden="true"></span>
+          </label>
+          <button class="tool-btn unread"><svg class="ic"><use href="#i-msg"/></svg>Unread<span class="badge">2</span></button>
+        </div>
+        <div class="table-scroll">
+          <table class="patients">
+            <thead>
+              <tr>
+                <th><svg class="ic"><use href="#i-user"/></svg>Patient name</th>
+                <th><svg class="ic"><use href="#i-calendar"/></svg>Service date</th>
+                <th><svg class="ic"><use href="#i-calendar"/></svg>Benefits verified on</th>
+                <th><svg class="ic"><use href="#i-steth"/></svg>Provider</th>
+                <th><svg class="ic"><use href="#i-shield"/></svg>Insurance provider</th>
+                <th><svg class="ic"><use href="#i-activity"/></svg>Status</th>
+                <th class="center"><svg class="ic"><use href="#i-check"/></svg>Patient cost<br />approved</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <div class="empty" id="empty" hidden>No patients match your filters.</div>
+        </div>
+      </section>
+    </main>
   </div>
 
-  <!-- POC debug panel -->
-  <section class="debug">
-    <div class="panel">
-      <h3>Transcript</h3>
-      <div id="transcript" class="transcript"><span class="hint">Try: “Patient is Emily Quezada, that's Q U E Z A D A, born March 4th 1988. Insurance is Aetna, policy number W 1 2 3 4 5 6 7 8 9, service date tomorrow, new patient with Dr. Barberis at Denver Allergy, phone 303 555 0100.”</span></div>
-    </div>
-    <div class="panel">
-      <h3>Timings</h3>
-      <div id="log" class="log"></div>
-    </div>
-  </section>
+  <!-- ================= Add Patient modal ================= -->
+  <div class="overlay" id="overlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <button class="close" id="close" aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+      <form id="form" autocomplete="off" novalidate>
+        <div class="col left">
+          <div class="eyebrow"><span class="dot"></span>Required information</div>
+          <h2 id="modal-title">Add Patient</h2>
+          <p class="sub">Enter patient and insurance details to start verification</p>
 
+          <div class="grid2">
+            <div class="field"><label for="f-first">First name <i>*</i></label><input id="f-first" name="first_name" placeholder="e.g. Emily" required /></div>
+            <div class="field"><label for="f-last">Last name <i>*</i></label><input id="f-last" name="last_name" placeholder="e.g. Quezada" required /></div>
+          </div>
+          <div class="field">
+            <label id="l-ins">Insurance provider <i>*</i></label>
+            <div class="select filled" data-name="insurance_provider" data-placeholder="Select insurance provider" data-icon="i-chevs" data-required aria-labelledby="l-ins"></div>
+          </div>
+          <div class="field">
+            <label for="f-policy">Policy number <i>*</i></label>
+            <input id="f-policy" name="policy_number" placeholder="Select insurance provider first" disabled required />
+          </div>
+          <div class="grid2">
+            <div class="field"><label for="f-dob">Date of birth <i>*</i></label><div class="date-wrap"><input id="f-dob" type="date" name="date_of_birth" required /><svg class="ic"><use href="#i-calendar"/></svg></div></div>
+            <div class="field"><label for="f-svc">Service date <i>*</i></label><div class="date-wrap"><input id="f-svc" type="date" name="service_date" required /><svg class="ic"><use href="#i-calendar"/></svg></div></div>
+          </div>
+
+          <div class="or"><span>OR</span></div>
+
+          <!-- Smart auto-fill: voice (live) + image (as in product) -->
+          <section class="autofill" id="autofill">
+            <div class="af-idle">
+              <div class="af-head">
+                <span class="af-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
+                <div>
+                  <div class="af-title">Smart auto-fill <span class="opt">Optional</span></div>
+                  <p>Speak the patient's details, or add a photo of the insurance card, and we'll fill in the form. You can edit anything.</p>
+                </div>
+              </div>
+              <div class="af-actions">
+                <button type="button" class="voice-btn" id="voice-start">
+                  <span class="vb-icon"><svg class="ic"><use href="#i-mic"/></svg></span>
+                  <span class="vb-text"><b>Fill by voice</b><small>Speak naturally, spell names if needed</small></span>
+                </button>
+                <button type="button" class="ghost-btn" data-soon><svg class="ic"><use href="#i-camera"/></svg>Take photo</button>
+                <button type="button" class="ghost-btn" data-soon><svg class="ic"><use href="#i-upload"/></svg>Upload file</button>
+              </div>
+              <p class="af-foot">Or drop or paste an image or PDF here. Up to 2 images (front and back). JPG, PNG, HEIC or PDF, 15 MB each.</p>
+            </div>
+
+            <div class="af-live" aria-live="polite">
+              <div class="live-head">
+                <span class="live-badge"><span class="rec"></span><span id="live-state">Listening</span></span>
+                <span class="timer" id="timer">0:00</span>
+                <span class="live-status" id="live-status"></span>
+                <button type="button" class="stop-btn" id="voice-stop"><span class="sq"></span>Done</button>
+              </div>
+              <canvas class="wave" id="wave" height="56" aria-hidden="true"></canvas>
+              <div class="transcript" id="transcript"><span class="hint">Try: “Patient is Emily Quezada, that's Q-U-E-Z-A-D-A, born March 4th 1988. Insurance is Aetna, policy W123456789, service date tomorrow.”</span></div>
+            </div>
+          </section>
+        </div>
+
+        <div class="col right">
+          <div class="eyebrow center">Optional details</div>
+          <div class="field">
+            <label id="l-prov">Provider name</label>
+            <div class="select" data-name="provider_name" data-placeholder="e.g. Dr. Barberis" aria-labelledby="l-prov"></div>
+          </div>
+          <div class="field">
+            <label id="l-clinic">Clinic</label>
+            <div class="select" data-name="clinic" data-placeholder="e.g. Denver Allergy" aria-labelledby="l-clinic"></div>
+          </div>
+          <div class="field"><label for="f-appt">Appointment type</label><input id="f-appt" name="appointment_type" placeholder="e.g. New Patient" /></div>
+          <div class="field"><label for="f-phone">Phone number</label><input id="f-phone" name="phone_number" placeholder="e.g. (303) 555-0100" inputmode="tel" /></div>
+          <div class="field"><label for="f-email">Email</label><input id="f-email" name="email" placeholder="e.g. patient@email.com" inputmode="email" /></div>
+
+          <figure class="illus" aria-hidden="true">
+            <svg viewBox="0 0 320 260">
+              <defs>
+                <radialGradient id="plat" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#2e6b4f"/><stop offset="1" stop-color="#1d4434"/></radialGradient>
+                <linearGradient id="coat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dfe7f3"/></linearGradient>
+              </defs>
+              <ellipse cx="160" cy="196" rx="96" ry="40" fill="url(#plat)"/>
+              <!-- cross / heart / pill -->
+              <g fill="#58b878"><rect x="44" y="64" width="10" height="28" rx="3"/><rect x="35" y="73" width="28" height="10" rx="3"/></g>
+              <path d="M262 94c-6-8-20-4-18 6 1 8 18 18 18 18s17-10 18-18c2-10-12-14-18-6z" fill="#e2445c"/>
+              <g transform="rotate(-8 252 36)"><rect x="232" y="28" width="40" height="15" rx="7.5" fill="#e9eef8"/><rect x="232" y="28" width="20" height="15" rx="7.5" fill="#4f78c9"/><rect x="246" y="28" width="6" height="15" fill="#4f78c9"/></g>
+              <!-- body -->
+              <path d="M112 200c0-38 20-62 48-62s48 24 48 62z" fill="url(#coat)"/>
+              <path d="M148 140h24l-12 22z" fill="#b9d1f2"/>
+              <path d="M160 162v38" stroke="#c9d6ea" stroke-width="2"/>
+              <circle cx="160" cy="174" r="2.4" fill="#8aa1c4"/><circle cx="160" cy="186" r="2.4" fill="#8aa1c4"/>
+              <!-- stethoscope -->
+              <path d="M140 142c-8 18-8 30 0 40" fill="none" stroke="#5b6475" stroke-width="3.2" stroke-linecap="round"/>
+              <circle cx="141" cy="186" r="6" fill="#5b6475"/><circle cx="141" cy="186" r="2.6" fill="#cfd6e2"/>
+              <!-- arms -->
+              <path d="M118 168c-10 10-14 22-8 30" stroke="#dfe7f3" stroke-width="13" stroke-linecap="round" fill="none"/>
+              <circle cx="111" cy="199" r="7" fill="#f6c8a2"/>
+              <!-- clipboard -->
+              <rect x="186" y="150" width="40" height="52" rx="5" fill="#cfe3f5"/>
+              <rect x="190" y="156" width="32" height="42" rx="3" fill="#fbfdff"/>
+              <rect x="198" y="146" width="16" height="9" rx="3" fill="#8193b0"/>
+              <path d="M196 176l5 5 9-10" stroke="#3fb37a" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M196 189h20M196 193h14" stroke="#c9d6ea" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="188" cy="186" r="7" fill="#f6c8a2"/>
+              <!-- head -->
+              <rect x="152" y="122" width="16" height="16" rx="5" fill="#eab48d"/>
+              <circle cx="160" cy="104" r="26" fill="#f6c8a2"/>
+              <circle cx="134" cy="106" r="5" fill="#eab48d"/><circle cx="186" cy="106" r="5" fill="#eab48d"/>
+              <path d="M134 98c0-18 12-28 26-28s26 10 26 28c-6-6-14-8-26-8s-20 2-26 8z" fill="#7a4a2e"/>
+              <path d="M136 84c4-14 14-20 24-20s20 6 24 20c-8-4-16-5-24-5s-16 1-24 5z" fill="#f4f7fb"/>
+              <rect x="136" y="82" width="48" height="8" rx="4" fill="#4f78c9"/>
+              <circle cx="151" cy="104" r="3" fill="#2b2f3a"/><circle cx="169" cy="104" r="3" fill="#2b2f3a"/>
+              <circle cx="146" cy="113" r="4" fill="#f29c9c" opacity=".6"/><circle cx="174" cy="113" r="4" fill="#f29c9c" opacity=".6"/>
+              <path d="M154 115c3 3 9 3 12 0" stroke="#b55b4a" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+              <!-- heartbeat -->
+              <path d="M28 236h34l8-14 9 26 9-20 6 8h30" fill="none" stroke="#3fb37a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M220 236h70" stroke="#3fb37a" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+            <figcaption>Smart benefits verification</figcaption>
+          </figure>
+        </div>
+
+        <div class="modal-foot">
+          <button type="button" class="cancel" id="cancel">Cancel</button>
+          <button type="submit" class="primary" id="submit">Add Patient &amp; Start Benefits Inquiry</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="/static/voice.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>
