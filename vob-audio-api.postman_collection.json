@@ -1,0 +1,273 @@
+{
+  "info": {
+    "name": "VOB Audio API",
+    "description": "Voice-to-form API (Add Patient). Set the `baseUrl` collection variable to the deployed host.\n\nThe live transcription WebSocket (`{{wsBaseUrl}}/ws/deepgram?model=nova-3`) can't be stored in a v2.1 collection: in Postman use New \u2192 WebSocket. It expects binary 16 kHz mono 16-bit PCM frames, then a text frame `stop`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "wsBaseUrl",
+      "value": "ws://localhost:8000"
+    },
+    {
+      "key": "today",
+      "value": "2026-10-15"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
+        },
+        "description": "Liveness probe."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+              "pm.test(\"status ok\", () => pm.expect(pm.response.json().status).to.eql(\"ok\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Config",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/config",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "config"
+          ]
+        },
+        "description": "Dropdown options, field list, STT and extraction model lists. Saves the default extraction model to `extractModel`."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+              "const j = pm.response.json();",
+              "pm.test(\"keys configured\", () => { pm.expect(j.deepgram_configured).to.be.true; pm.expect(j.openrouter_configured).to.be.true; });",
+              "pm.collectionVariables.set(\"extractModel\", j.extract_models[0]);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Extract",
+      "item": [
+        {
+          "name": "Extract - first utterance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/extract",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "extract"
+              ]
+            },
+            "description": "Empty form + first transcript. Expect names, insurer (United \u2192 UnitedHealthcare), service date = today + 1.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transcript\": \"Patient is Emily Quezada, that's Q U E Z A D A, born March 4th 1988. Insurance is United, policy number W 1 2 3 4 5 6 7 8 9, service date tomorrow, new patient with Dr. Barberis at Denver Allergy, phone 303 555 0100.\",\n  \"current\": {\n      \"first_name\": null,\n      \"last_name\": null,\n      \"insurance_provider\": null,\n      \"policy_number\": null,\n      \"date_of_birth\": null,\n      \"service_date\": null,\n      \"provider_name\": null,\n      \"clinic\": null,\n      \"appointment_type\": null,\n      \"phone_number\": null,\n      \"email\": null\n  },\n  \"today\": \"{{today}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"all 11 fields returned\", () => pm.expect(Object.keys(j.fields)).to.have.lengthOf(11));",
+                  "pm.test(\"has model + ms\", () => { pm.expect(j.model).to.be.a(\"string\"); pm.expect(j.ms).to.be.a(\"number\"); });",
+                  "pm.test(\"insurer matched\", () => pm.expect(j.fields.insurance_provider).to.eql(\"UnitedHealthcare\"));",
+                  "pm.test(\"last name spelled\", () => pm.expect(j.fields.last_name).to.eql(\"Quezada\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extract - correction on existing form",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/extract",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "extract"
+              ]
+            },
+            "description": "Form already filled; speaker corrects the first name. Other fields should be kept.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transcript\": \"Patient is Emily Quezada. Actually the first name is Emilia.\",\n  \"current\": {\n    \"first_name\": \"Emily\",\n    \"last_name\": \"Quezada\",\n    \"insurance_provider\": \"Aetna\",\n    \"policy_number\": null,\n    \"date_of_birth\": null,\n    \"service_date\": null,\n    \"provider_name\": null,\n    \"clinic\": null,\n    \"appointment_type\": null,\n    \"phone_number\": null,\n    \"email\": null\n  },\n  \"model\": \"{{extractModel}}\",\n  \"today\": \"{{today}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"all 11 fields returned\", () => pm.expect(Object.keys(j.fields)).to.have.lengthOf(11));",
+                  "pm.test(\"has model + ms\", () => { pm.expect(j.model).to.be.a(\"string\"); pm.expect(j.ms).to.be.a(\"number\"); });",
+                  "pm.test(\"correction applied\", () => pm.expect(j.fields.first_name).to.eql(\"Emilia\"));",
+                  "pm.test(\"existing kept\", () => pm.expect(j.fields.insurance_provider).to.eql(\"Aetna\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extract - unknown model (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/extract",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "extract"
+              ]
+            },
+            "description": "Error format check.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transcript\": \"hello\",\n  \"model\": \"not-a-model\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"error message\", () => pm.expect(pm.response.json().error).to.include(\"unknown model\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extract - invalid body (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/extract",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "extract"
+              ]
+            },
+            "description": "Wrong type for `current` \u2192 FastAPI validation error.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transcript\": \"hello\",\n  \"current\": \"not-an-object\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
