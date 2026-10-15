@@ -40,7 +40,9 @@ Rules:
 - Never invent values that were not said."""
 
 
-async def extract(transcript: str, current: dict, model: str, today: date) -> tuple[dict | None, str, str | None, str | None]:
+async def extract(
+    transcript: str, current: dict, model: str, today: date
+) -> tuple[dict | None, str, str | None, str | None]:
     """Returns (fields, model_used, fallback_reason, error)."""
     user = (
         f"Today's date: {today.isoformat()}\n\n"

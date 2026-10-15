@@ -16,6 +16,16 @@ uv run uvicorn app.main:app --reload --port 8000
 ```
 API docs (OpenAPI): http://localhost:8000/docs
 
+## Develop
+```bash
+uv sync                 # includes dev tools (pytest, ruff)
+uv run pytest           # offline: the LLM call is stubbed
+uv run ruff check .
+```
+CI runs the same checks plus a Docker build on every PR. Work on a branch and open a PR into `main`.
+
+Postman: import `postman/vob-speech-to-form.postman_collection.json` and set `baseUrl`. Postman can also import `/openapi.json` directly.
+
 ## Deploy
 ```bash
 docker build -t vob-audio .
@@ -45,4 +55,6 @@ Open http://localhost:8000 in **Chrome**. Press the mic (or Space).
 - `app/routes/stream.py` – `/ws/deepgram` live relay
 - `app/stt.py`, `app/extract.py` – Deepgram live settings; LLM extraction + normalization
 - `static/` – demo UI: replica of the Add Patient modal + POC toolbar/debug panels
-- `vob-audio-api.postman_collection.json` – Postman collection (set `baseUrl`)
+- `tests/` – pytest suite
+- `postman/` – Postman collection (smoke tests against a running server)
+- `.github/` – CI workflow + Dependabot

@@ -3,3 +3,4 @@
 __pycache__/
 recordings/
 .ruff_cache/
+.pytest_cache/
