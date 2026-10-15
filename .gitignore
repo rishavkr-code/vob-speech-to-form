@@ -4,3 +4,5 @@ __pycache__/
 recordings/
 .ruff_cache/
 .pytest_cache/
+# Environments point at real deployments; keep them out while the repo is public and the API has no auth.
+postman/*.postman_environment.json
