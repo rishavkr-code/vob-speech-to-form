@@ -279,6 +279,7 @@ const voice = (() => {
   let session = null, finals = [], interim = "", t0 = 0, tick = null, raf = null;
   let inflight = false, queued = false, debounce = null, filledThisSession = new Set();
   let gen = 0;               // bumps on reset, so a late response can't touch a cleared form
+  let sid = 0;               // bumps per session, so a previous session's late events are ignored
   let finalPending = false;  // a "Done" click is waiting for its last extraction
   const levels = [];
   const EXAMPLE_HINT = tEl.innerHTML;
@@ -395,10 +396,12 @@ const voice = (() => {
     card.classList.add("live", "connecting");
     $("#live-state").textContent = "Connecting";
     setStatus("");
+    const my = ++sid;
+    const mine = (fn) => (...a) => { if (my === sid) fn(...a); };
     try {
-      session = await Voice.start({
+      const s = await Voice.start({
         model: config.stt_models[0],
-        onOpen() {
+        onOpen: mine(() => {
           card.classList.remove("connecting");
           $("#live-state").textContent = "Listening";
           t0 = Date.now();
@@ -406,13 +409,15 @@ const voice = (() => {
             const s = Math.floor((Date.now() - t0) / 1000);
             $("#timer").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
           }, 250);
-        },
-        onInterim(text) { interim = text; renderTranscript(); },
-        onFinal(text) { finals.push(text); interim = ""; renderTranscript(); },
-        onUtteranceEnd: schedule,
-        onError(msg) { toast("Voice input stopped", { detail: msg, kind: "err" }); stop({ silent: true }); },
-        onClose() { if (session) stop({ silent: true }); },
+        }),
+        onInterim: mine((text) => { interim = text; renderTranscript(); }),
+        onFinal: mine((text) => { finals.push(text); interim = ""; renderTranscript(); }),
+        onUtteranceEnd: mine(schedule),
+        onError: mine((msg) => { if (session) { toast("Voice input stopped", { detail: msg, kind: "err" }); stop(); } }),
+        onClose: mine(() => { if (session) stop(); }),
       });
+      if (my !== sid) return s.stop();  // reset/closed while connecting
+      session = s;
       $("#timer").textContent = "0:00";
       draw();
     } catch (e) {
@@ -454,7 +459,7 @@ const voice = (() => {
 
   function reset() {
     if (session) stop({ silent: true });
-    gen++;
+    gen++; sid++;
     clearTimeout(debounce);
     finals = []; interim = ""; queued = false; finalPending = false;
     card.classList.remove("live", "connecting");
